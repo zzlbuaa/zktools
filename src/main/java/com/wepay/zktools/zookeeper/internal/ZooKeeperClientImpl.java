@@ -26,8 +26,11 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -54,6 +57,8 @@ public class ZooKeeperClientImpl implements ZooKeeperClient {
 
     private volatile boolean running = true;
 
+    private final int SESSION_CREATION_TIMEOUT = 20;
+
     public ZooKeeperClientImpl(String connectString, int sessionTimeout) throws ZooKeeperClientException {
         this.connectString = connectString;
         this.sessionTimeout = sessionTimeout;
@@ -65,8 +70,8 @@ public class ZooKeeperClientImpl implements ZooKeeperClient {
         // Create a session
         try {
             CompletableFuture<ZooKeeperSessionImpl> future = ZooKeeperSessionImpl.createAsync(this);
-            sessionRef = new SessionRef(future.join());
-        } catch (CompletionException ex) {
+            sessionRef = new SessionRef(future.get(SESSION_CREATION_TIMEOUT, TimeUnit.SECONDS));
+        } catch (CompletionException | InterruptedException | ExecutionException | TimeoutException ex) {
             connectErrorRef.set(ex.getCause());
             throw new ZooKeeperClientException("connection failure", ex.getCause());
         }
